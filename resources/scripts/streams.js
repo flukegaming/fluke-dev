@@ -110,8 +110,9 @@ async function loadYouTube() {
     } else {
         const ytVideos = await getYouTubeVideos(CHANNEL_ID, API_KEY);
         if (ytVideos) {
+            videoData = showYouTubeVideos(ytVideos);
             container.innerHTML = `
-                <p class="stream__offline-label">Latest Videos</p>
+                <h2 class="section__subheader">Latest Videos</h2>${videoData}
             `;
         } else {
             container.innerHTML = `
