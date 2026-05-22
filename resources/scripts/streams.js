@@ -7,6 +7,12 @@ const tabs = {
 
 let twitchPlayer = null;
 
+function formatDate(iso) {
+    return new Date(iso).toLocaleDateString('en-CA', {
+        year: 'numeric', month: 'short', day: 'numeric'
+    });
+}
+
 // ---------- TWITCH STREAM ----------
 
 function loadTwitch() {
@@ -27,7 +33,7 @@ function loadTwitch() {
 async function isYouTubeLive(channelId, apiKey) {
     const base = 'https://www.googleapis.com/youtube/v3';
     try {
-        const res  = await fetch(
+        const res = await fetch(
             `${base}/search?part=snippet&channelId=${channelId}` +
             `&eventType=live&type=video&key=${apiKey}`
         );
@@ -41,11 +47,57 @@ async function isYouTubeLive(channelId, apiKey) {
     }
 }
 
+async function getYouTubeVideos(channelId, apiKey) {
+    const base = 'https://www.googleapis.com/youtube/v3';
+    try {
+        const res = await fetch(
+            `${base}/search?part=snippet&channelId=${channelId}` +
+            `&order=date&type=video&maxResults=2&key=${apiKey}`
+        );
+        const data = await res.json();
+        return (data.items && data.items.length > 0)
+            ? data.items : null;
+    } catch (err) {
+        console.error('YT Video check failed:', err);
+        return null;
+    }
+}
+
+function showYouTubeVideos(videos) {
+    html = videos.map(v => {
+        const id = v.id.videoId;
+        const title = v.snippet.title;
+        const thumb = v.snippet.thumbnails.medium.url;
+        const date = formatDate(v.snippet.publishedAt);
+
+        return `
+            <a class="stream__card"
+                href="https://www.youtube.com/watch?v=${id}"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="${title}">
+                <div class="stream__card-thumb-wrap">
+                    <img class="stream__card-thumb"
+                        src="${thumb}"
+                        alt="${title}"
+                        loading="lazy">
+                </div>
+                <div class="stream__card-info">
+                    <p class="stream__card-title">${title}</p>
+                    <p class="stream__card-date">${date}</p>
+                </div>
+            </a>
+        `;
+    }).join('');
+
+    return html;
+}
+
 async function loadYouTube() {
     const API_KEY = 'AIzaSyBLAdU6OWt4djsbPXZGITUlkl6FYePXZ-w';
     const CHANNEL_ID = 'UCewiYYWHvvmSqnxq5U9TNZg';
-        
-    var videoId = await isYouTubeLive(CHANNEL_ID, API_KEY);
+
+    const videoId = await isYouTubeLive(CHANNEL_ID, API_KEY);
     console.log(videoId);
 
     if (videoId) {
@@ -56,7 +108,17 @@ async function loadYouTube() {
             </iframe>
         `;
     } else {
-        container.innerHTML = 'offline';
+        const ytVideos = await getYouTubeVideos(CHANNEL_ID, API_KEY);
+        if (ytVideos) {
+            container.innerHTML = `
+                <p class="stream__offline-label">Latest Videos</p>
+            `;
+        } else {
+            container.innerHTML = `
+                <h2 class="section__subheader">Could not load channel info.</h2>
+            `;
+        }
+
     }
 
     twitchPlayer = null;
