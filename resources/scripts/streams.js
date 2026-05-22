@@ -26,37 +26,40 @@ function loadTwitch() {
 
 async function isYouTubeLive(channelId, apiKey) {
     const base = 'https://www.googleapis.com/youtube/v3';
-
     try {
-        const liveResponse = await fetch(
+        const res  = await fetch(
             `${base}/search?part=snippet&channelId=${channelId}` +
             `&eventType=live&type=video&key=${apiKey}`
         );
-
-        const liveData = await liveResponse.json();
-        return (liveData.items && liveData.items.length > 0);
-
+        const data = await res.json();
+        return (data.items && data.items.length > 0)
+            ? data.items[0].id.videoId     // truthy string if live
+            : null;                        // null if offline
     } catch (err) {
-      console.error('YT Live check failed:', err);
-      elStatus.querySelector('.stream__status-text').textContent =
-        'Could not load stream info.';
+        console.error('YT Live check failed:', err);
+        return null;
     }
 }
 
-function loadYouTube() {
+async function loadYouTube() {
     const API_KEY = 'AIzaSyBLAdU6OWt4djsbPXZGITUlkl6FYePXZ-w';
     const CHANNEL_ID = 'UCewiYYWHvvmSqnxq5U9TNZg';
+        
+    var videoId = await isYouTubeLive(CHANNEL_ID, API_KEY);
+    console.log(videoId);
 
-    // Twitch embed doesn't have a clean destroy API, so wipe DOM
-    container.innerHTML = `
-        <iframe frameborder="0" modestbranding="1" mute="1" allowfullscreen
-        src="https://www.youtube.com/embed/live_stream?channel=${CHANNEL_ID}">
-        </iframe>
-    `;
+    if (videoId) {
+        container.innerHTML = `
+            <iframe frameborder="0" modestbranding="1" allowfullscreen
+                allow="autoplay; encrypted-media"
+                src="https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1">
+            </iframe>
+        `;
+    } else {
+        container.innerHTML = 'offline';
+    }
+
     twitchPlayer = null;
-    
-    var isLive = isYouTubeLive(CHANNEL_ID, API_KEY);
-    console.log(isLive);
 }
 
 // ---------- STREAM SELECTOR ----------
