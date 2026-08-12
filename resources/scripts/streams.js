@@ -9,23 +9,69 @@ let twitchPlayer = null;
 
 function formatDate(iso) {
     return new Date(iso).toLocaleDateString('en-CA', {
-        year: 'numeric', month: 'short', day: 'numeric'
+        month: 'short', day: 'numeric'
     });
 }
 
 // ---------- TWITCH STREAM ----------
 
-function loadTwitch() {
+async function isTwitchLive(url) {
+    try {
+        const res = await fetch(`${url}/stream-status`);
+        const data = await res.json();
+
+        return data.live;
+    } catch (err) {
+        console.error('TTV Live check failed:', err);
+        return false;
+    }
+}
+
+async function getTwitchChannelInfo(url) {
+    try {
+        const res = await fetch(`${url}/channel-info`);
+        const data = await res.json();
+
+        return data;
+    } catch (err) {
+        console.error('TTV channel info failed:', err);
+        return null;
+    }
+}
+
+async function showTwitchOffline(url) {
+    const channelInfo = await getTwitchChannelInfo(url);
+    const offlineBanner = channelInfo.offline_image;
+
+    offlineHtml = `
+        <a class="grid" href="https://www.twitch.tv/flukegamingttv" target="_blank">
+            <img class="card__thumb--thumb" src="${offlineBanner}" />
+        </a>
+    `;
+    return offlineHtml;
+}
+
+async function loadTwitch() {
     container.innerHTML = ''; // clear YouTube iframe if present
+    const url = 'https://twitch-helix.flukegaming57.workers.dev';
 
-    var options = {
-        autoplay: false,
-        muted: true,
-        channel: 'flukegamingttv'
-    };
+    const isLive = await isTwitchLive(url);
 
-    var twitchPlayer = new Twitch.Player(container, options);
-    twitchPlayer.setVolume(0.5);
+    if (isLive) {
+        var options = {
+            autoplay: false,
+            muted: true,
+            channel: 'flukegamingttv'
+        };
+
+        var twitchPlayer = new Twitch.Player(container, options);
+        twitchPlayer.setVolume(0.5);
+
+    } else {
+        const twitchOffline = await showTwitchOffline(url);
+        container.innerHTML = twitchOffline;
+    }
+
 }
 
 // ---------- YOUTUBE STREAM ----------
@@ -49,47 +95,63 @@ async function isYouTubeLive(channelId, apiKey) {
 
 async function getYouTubeVideos(channelId, apiKey) {
     const base = 'https://www.googleapis.com/youtube/v3';
-    try {
-        const res = await fetch(
-            `${base}/search?part=snippet&channelId=${channelId}` +
-            `&order=date&type=video&maxResults=2&key=${apiKey}`
-        );
-        const data = await res.json();
-        return (data.items && data.items.length > 0)
-            ? data.items : null;
-    } catch (err) {
-        console.error('YT Video check failed:', err);
-        return null;
-    }
+
+    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+        return [
+            {
+                id: { videoId: "iT5A3RgkMwk" },
+                snippet: {
+                    title: "PokeOne Adventures",
+                    thumbnails: { medium: { url: "https://i.ytimg.com/vi/iT5A3RgkMwk/mqdefault.jpg" } },
+                    publishedAt: "2026-06-02T03:31:44Z"
+                }
+            },
+            {
+                id: { videoId: "T68lC9wbRr0" },
+                snippet: {
+                    title: "PokeOne Hangouts",
+                    thumbnails: { medium: { url: "https://i.ytimg.com/vi/T68lC9wbRr0/mqdefault.jpg" } },
+                    publishedAt: "2026-06-01T03:17:41Z"
+                }
+            }
+        ];
+    } else {
+        try {
+            const res = await fetch(
+                `${base}/search?part=snippet&channelId=${channelId}` +
+                `&order=date&type=video&maxResults=2&key=${apiKey}`
+            );
+            const data = await res.json();
+            return (data.items && data.items.length > 0)
+                ? data.items : null;
+        } catch (err) {
+            console.error('YT Video check failed:', err);
+            return null;
+        }
+    }    
 }
 
 function showYouTubeVideos(videos) {
-    html = videos.map(v => {
+    videoHtml = videos.map(v => {
         const id = v.id.videoId;
         const title = v.snippet.title;
         const thumb = v.snippet.thumbnails.medium.url;
         const date = formatDate(v.snippet.publishedAt);
 
         return `
-            <a class="stream__card"
-                href="https://www.youtube.com/watch?v=${id}"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="${title}">
-                <div class="stream__card-thumb-wrap">
-                    <img class="stream__card-thumb"
-                        src="${thumb}"
-                        alt="${title}"
-                        loading="lazy">
-                </div>
-                <div class="stream__card-info">
-                    <p class="stream__card-title">${title}</p>
-                    <p class="stream__card-date">${date}</p>
+            <a class="grid card__thumb" href="https://www.youtube.com/watch?v=${id}"
+                target="_blank" rel="noopener noreferrer" aria-label="${title}">
+                <img class="card__thumb--thumb" loading="lazy"
+                    src="${thumb}" alt="${title}">
+                <div class="grid card__thumb--info">
+                    <h4 class="card__thumb--title">${title}</h4>
+                    <h4 class="card__thumb--date">${date}</h4>
                 </div>
             </a>
         `;
     }).join('');
 
+    html = `<div class="grid grid--tight grid--2">${videoHtml}<div>`;
     return html;
 }
 
